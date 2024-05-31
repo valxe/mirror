@@ -1,0 +1,11 @@
+{
+  "tokens": [
+    {
+      "token": "toukan",
+      "flask_server": "some_link",
+      "channels": {
+        "some_id": "webhook"
+      }
+    }
+  ]
+}
