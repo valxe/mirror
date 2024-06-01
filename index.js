@@ -1,57 +1,77 @@
-const Discord = require('discord.js-selfbot-v13');
-const request = require('request');
+const Dsc = require('discord.js-selfbot-v13');
+const req = require('request-promise-native');
 const fs = require('fs');
+const {
+    performance
+} = require('perf_hooks');
 
-const config = JSON.parse(fs.readFileSync('config.json', 'utf8'));
+const cfg = JSON.parse(fs.readFileSync('config.json', 'utf8'));
 
-config.tokens.forEach(entry => {
-    const client = new Discord.Client({
+const clnts = [];
+
+function logMemUsage() {
+    const used = process.memoryUsage();
+    for (let key in used) {
+        console.log(`${key} ${Math.round(used[key] / 1024 / 1024 * 100) / 100} MB`);
+    }
+}
+
+setInterval(logMemUsage, 60000);
+
+cfg.tokens.forEach(ent => {
+    const clnt = new Dsc.Client({
         checkUpdate: false,
     });
 
-    client.once('ready', () => {
-        console.log(`Logged in as ${client.user.tag}!`);
+    clnts.push(clnt);
+
+    clnt.once('ready', () => {
+        console.log(`Logged in as ${clnt.user.tag}!`);
     });
 
-    function log(message) {
-        if (message.author.bot) return;
+    function log(msg) {
+        if (msg.author.bot) return;
 
-        const webhookUrl = entry.channels[message.channel.id];
-        if (!webhookUrl) {
+        const whUrl = ent.channels[msg.channel.id];
+        if (!whUrl) {
             return;
         }
 
-        const webhookName = message.author.username;
-        const avatarURL = message.author.displayAvatarURL({
+        const whName = msg.author.username;
+        const avUrl = msg.author.displayAvatarURL({
             dynamic: true
         });
 
-        if (!message.content.includes("@here") && !message.content.includes("@everyone")) {
-            const options = {
-                uri: entry.flask_server,
+        if (!msg.content.includes("@here") && !msg.content.includes("@everyone")) {
+            const opts = {
+                uri: ent.flask_server,
                 method: 'POST',
                 json: {
-                    username: webhookName,
-                    content: message.content,
-                    avatar_url: avatarURL,
-                    webhook_url: webhookUrl
+                    username: whName,
+                    content: msg.content,
+                    avatar_url: avUrl,
+                    webhook_url: whUrl
                 }
             };
 
-            request(options, (error, response, body) => {
-                if (error) {
-                    console.error(`Error sending message to Flask server: ${error.message}`);
-                } else if (response.statusCode !== 200) {
-                    console.error(`Error sending message to Flask server: Received status code ${response.statusCode}`);
-                } else {
-                    console.log(`Message sent successfully.`);
-                }
-            });
+            req(opts)
+                .then(res => {})
+                .catch(err => {
+                    console.error(`Error sending message to Flask server: ${err.message}`);
+                });
         } else {
             console.log('Message contains @here or @everyone. Not sending via webhook.');
         }
     }
 
-    client.on('message', log);
-    client.login(entry.token);
-})
+    clnt.on('messageCreate', log);
+
+    clnt.login(ent.token).catch(console.error);
+});
+
+process.on('exit', () => {
+    clnts.forEach(clnt => {
+        clnt.destroy();
+    });
+    console.log('Cleanup complete.');
+});
