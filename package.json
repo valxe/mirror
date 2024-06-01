@@ -2,10 +2,10 @@
   "name": "Mirror",
   "version": "1.0.0",
   "description": "Nah",
-  "main": "index.js"
+  "main": "index.js",
   "dependencies": {
     "discord.js-selfbot-v13": "^2.12.0",
-    "request": "^2.88.2"
+    "request-promise-native": "^1.0.9"
   },
   "devDependencies": {},
   "author": "valxe",
