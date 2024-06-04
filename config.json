@@ -2,6 +2,7 @@
   "tokens": [
     {
       "token": "toukan",
+      "use_flask": true,
       "flask_server": "some_link",
       "channels": {
         "some_id": "webhook"
