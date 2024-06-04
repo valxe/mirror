@@ -4,8 +4,8 @@
   "description": "Nah",
   "main": "index.js",
   "dependencies": {
-    "discord.js-selfbot-v13": "^2.12.0",
-    "request-promise-native": "^1.0.9"
+    "discord.js-selfbot-v13": "*",
+    "axios": "*"
   },
   "devDependencies": {},
   "author": "valxe",
