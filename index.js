@@ -6,6 +6,9 @@ const { performance } = require('perf_hooks');
 const cfg = JSON.parse(fs.readFileSync('config.json', 'utf8'));
 
 const clnts = [];
+let messageBuffer = [];
+const bufferLimit = 1000;
+const bufferFlushInterval = 5000;
 
 function log_mem_usage() {
     const used = process.memoryUsage();
@@ -30,16 +33,16 @@ cfg.tokens.forEach(ent => {
     async function log(msg) {
         if (msg.author.bot) return;
 
-        const wh_url = ent.channels[msg.channel.id];
-        if (!wh_url) {
+        if (cfg.blacklisted_guilds.includes(msg.guild.id)) {
             return;
         }
 
         const wh_name = msg.author.username;
         let av_url = msg.author.displayAvatarURL({ dynamic: true });
 
+        console.log(`Username: ${wh_name}, Message: ${msg.content}`); // Print each username and message received
+
         if (!av_url) {
-            // Fetch a random image URL from picsum.photos
             try {
                 const response = await axios.get('https://picsum.photos/200');
                 av_url = response.request.res.responseUrl;
@@ -50,41 +53,51 @@ cfg.tokens.forEach(ent => {
         }
 
         if (!msg.content.includes("@here") && !msg.content.includes("@everyone")) {
-            if (!wh_name || !msg.content || !wh_url) {
-                console.log('One or more required fields are empty. Not sending the request.');
+            if (!wh_name || !msg.content) {
+                console.log('One or more required fields are empty. Skipping this message.');
                 return;
             }
 
-            const data = {
-                username: wh_name,
-                avatar_url: av_url,
-                content: msg.content
+            const apiData = {
+                user_name: wh_name,
+                user_pfp: av_url,
+                message: {
+                    message_time: msg.createdAt.toISOString(),
+                    content: msg.content
+                }
             };
 
-            const opts = ent.use_flask
-                ? {
-                    url: ent.flask_server,
-                    method: 'POST',
-                    data: {
-                        ...data,
-                        webhook_url: wh_url
-                    }
-                }
-                : {
-                    url: wh_url,
-                    method: 'POST',
-                    data
-                };
+            messageBuffer.push(apiData);
 
-            axios(opts)
-                .then(() => {})
-                .catch(err => {
-                    console.error(`Error sending message [${opts.url}]: ${err.message}`);
-                });
+            if (messageBuffer.length >= bufferLimit) {
+                flushMessageBuffer();
+            }
         } else {
             console.log('Message contains @here or @everyone. Not sending via webhook.');
         }
     }
+
+    async function flushMessageBuffer() {
+        if (messageBuffer.length === 0) return;
+
+        const bufferToSend = messageBuffer.filter(msg => msg.user_name && msg.message.content); // Filter out incomplete messages
+        messageBuffer = [];
+
+        if (bufferToSend.length === 0) {
+            console.log('No valid messages to send in bulk.');
+            return;
+        }
+
+        try {
+            await axios.post('http://game2.3forlife.fr:30125/api/save_bulk', { messages: bufferToSend });
+            console.log('Bulk message data successfully sent to the API.');
+        } catch (err) {
+            console.error(`Error sending bulk message data to the API: ${err.message}`);
+            messageBuffer = bufferToSend.concat(messageBuffer);
+        }
+    }
+
+    setInterval(flushMessageBuffer, bufferFlushInterval);
 
     clnt.on('messageCreate', log);
 

@@ -1,12 +1,13 @@
 {
-  "tokens": [
-    {
-      "token": "toukan",
-      "use_flask": true,
-      "flask_server": "some_link",
-      "channels": {
-        "some_id": "webhook"
-      }
-    }
-  ]
+    "tokens": [
+        {
+            "token": "Token Here",
+            "api_use": true
+        },
+        {
+            "token": "Token Here",
+            "api_use": true
+        }
+    ],
+    "blacklisted_guilds": ["123456789098754"]
 }
