@@ -1,23 +1,36 @@
 const dsc = require('discord.js-selfbot-v13');
 const axios = require('axios');
 const fs = require('fs');
-const { performance } = require('perf_hooks');
 
 const cfg = JSON.parse(fs.readFileSync('config.json', 'utf8'));
 
 const clnts = [];
 let messageBuffer = [];
-const bufferLimit = 1000;
-const bufferFlushInterval = 5000;
+const bufferLimit = 425;
 
-function log_mem_usage() {
-    const used = process.memoryUsage();
-    for (let key in used) {
-        console.log(`${key} ${Math.round(used[key] / 1024 / 1024 * 100) / 100} MB`);
+async function flushMessageBuffer() {
+    if (messageBuffer.length === 0) return;
+
+    const bufferToSend = messageBuffer.filter(msg => msg.user_name && msg.message.content);
+    messageBuffer = [];
+
+    if (bufferToSend.length === 0) {
+        console.log('No valid messages to send in bulk.');
+        return;
+    }
+
+    try {
+        await axios.post(
+            cfg.api_url, 
+            { messages: bufferToSend },
+            { headers: { 'API-Key': cfg.api_key } }
+        );
+        console.log('Bulk message data successfully sent to the API.');
+    } catch (err) {
+        console.error(`Error sending bulk message data to the API: ${err.message}`);
+        messageBuffer = bufferToSend.concat(messageBuffer);
     }
 }
-
-setInterval(log_mem_usage, 30000);
 
 cfg.tokens.forEach(ent => {
     const clnt = new dsc.Client({
@@ -26,8 +39,35 @@ cfg.tokens.forEach(ent => {
 
     clnts.push(clnt);
 
-    clnt.once('ready', () => {
+    clnt.once('ready', async () => {
         console.log(`Logged in as ${clnt.user.tag}!`);
+
+        if (cfg.debug) {
+            try {
+                const sharedServers = {};
+                clnts.forEach(client => {
+                    client.guilds.cache.forEach(guild => {
+                        if (!sharedServers[guild.id]) {
+                            sharedServers[guild.id] = [];
+                        }
+                        sharedServers[guild.id].push(client.user.tag);
+                    });
+                });
+
+                for (const [guildId, userTags] of Object.entries(sharedServers)) {
+                    if (userTags.length > 1) {
+                        const guild = clnts[0].guilds.cache.get(guildId);
+                        if (guild) {
+                            await axios.post(cfg.webhook_url, {
+                                content: `Accounts in the same server: ${guild.name}\nAccounts: ${userTags.join(', ')}`
+                            });
+                        }
+                    }
+                }
+            } catch (error) {
+                console.error(`Error during debug check: ${error.message}`);
+            }
+        }
     });
 
     async function log(msg) {
@@ -40,21 +80,17 @@ cfg.tokens.forEach(ent => {
         const wh_name = msg.author.username;
         let av_url = msg.author.displayAvatarURL({ dynamic: true });
 
-        console.log(`Username: ${wh_name}, Message: ${msg.content}`); // Print each username and message received
-
         if (!av_url) {
             try {
                 const response = await axios.get('https://picsum.photos/200');
                 av_url = response.request.res.responseUrl;
             } catch (error) {
-                console.error('Error fetching random image:', error.message);
                 return;
             }
         }
 
         if (!msg.content.includes("@here") && !msg.content.includes("@everyone")) {
             if (!wh_name || !msg.content) {
-                console.log('One or more required fields are empty. Skipping this message.');
                 return;
             }
 
@@ -72,32 +108,8 @@ cfg.tokens.forEach(ent => {
             if (messageBuffer.length >= bufferLimit) {
                 flushMessageBuffer();
             }
-        } else {
-            console.log('Message contains @here or @everyone. Not sending via webhook.');
         }
     }
-
-    async function flushMessageBuffer() {
-        if (messageBuffer.length === 0) return;
-
-        const bufferToSend = messageBuffer.filter(msg => msg.user_name && msg.message.content); // Filter out incomplete messages
-        messageBuffer = [];
-
-        if (bufferToSend.length === 0) {
-            console.log('No valid messages to send in bulk.');
-            return;
-        }
-
-        try {
-            await axios.post('http://game2.3forlife.fr:30125/api/save_bulk', { messages: bufferToSend });
-            console.log('Bulk message data successfully sent to the API.');
-        } catch (err) {
-            console.error(`Error sending bulk message data to the API: ${err.message}`);
-            messageBuffer = bufferToSend.concat(messageBuffer);
-        }
-    }
-
-    setInterval(flushMessageBuffer, bufferFlushInterval);
 
     clnt.on('messageCreate', log);
 
