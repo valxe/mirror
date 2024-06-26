@@ -1,13 +1,13 @@
 {
+    "api_url": "backend",
+    "api_key": "api_key",
     "tokens": [
         {
-            "token": "Token Here",
-            "api_use": true
-        },
-        {
-            "token": "Token Here",
+            "token": "toukan",
             "api_use": true
         }
     ],
-    "blacklisted_guilds": ["123456789098754"]
+    "blacklisted_guilds": ["14803830835853429"],
+    "debug": true,
+    "webhook_url": "webhook_url"
 }
