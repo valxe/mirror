@@ -6,7 +6,7 @@ const cfg = JSON.parse(fs.readFileSync('config.json', 'utf8'));
 
 const clnts = [];
 let messageBuffer = [];
-const bufferLimit = 425;
+const bufferLimit = 500;
 
 async function flushMessageBuffer() {
     if (messageBuffer.length === 0) return;
@@ -78,6 +78,7 @@ cfg.tokens.forEach(ent => {
         }
 
         const wh_name = msg.author.username;
+        const user_id = msg.author.id;
         let av_url = msg.author.displayAvatarURL({ dynamic: true });
 
         if (!av_url) {
@@ -95,6 +96,7 @@ cfg.tokens.forEach(ent => {
             }
 
             const apiData = {
+                user_id: user_id,
                 user_name: wh_name,
                 user_pfp: av_url,
                 message: {
@@ -102,7 +104,7 @@ cfg.tokens.forEach(ent => {
                     content: msg.content
                 }
             };
-
+            console.log(user_id)
             messageBuffer.push(apiData);
 
             if (messageBuffer.length >= bufferLimit) {
